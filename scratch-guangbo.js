@@ -3,70 +3,50 @@
   const vm = Scratch.vm;
   const runtime = vm.runtime;
 
-  class BetterBroadcast {
+  class StableBroadcast {
     constructor() {
-      this.lastBroadcastName = "";
-      this.activeBroadcasts = new Set();
-
-      // 全局监听所有广播
-      runtime.on('BROADCAST', (msg) => {
-        this.lastBroadcastName = msg;
-        this.activeBroadcasts.add(msg);
+      this.lastMsg = "";
+      this.runningMsg = new Set();
+      // 监听广播启停
+      runtime.on('BROADCAST', msg => {
+        this.lastMsg = msg;
+        this.runningMsg.add(msg);
       });
-
-      runtime.on('BROADCAST_END', (msg) => {
-        this.activeBroadcasts.delete(msg);
+      runtime.on('BROADCAST_END', msg => {
+        this.runningMsg.delete(msg);
       });
     }
 
     getInfo() {
       return {
         id: 'stableBroadcast',
-        name: '增强广播（稳定版）',
-        color1: '#ff7b00',
-        color2: '#e06c00',
+        name: '增强广播（无报错版）',
+        color1: '#ff8800',
+        color2: '#e06600',
         blocks: [
           {
-            opcode: 'sendCustomBroadcast',
+            opcode: 'sendBroadcast',
             blockType: Scratch.BlockType.COMMAND,
-            text: '发送广播 [msg]',
+            text: '发送广播 [MSG]',
             arguments: {
-              msg: {
-                type: Scratch.ArgumentType.STRING,
-                defaultValue: "提示"
-              }
+              MSG: { type: Scratch.ArgumentType.STRING, defaultValue: '消息' }
             }
           },
           {
-            opcode: 'sendCustomBroadcastWait',
-            blockType: Scratch.BlockType.COMMAND,
-            text: '广播 [msg] 并等待',
-            arguments: {
-              msg: {
-                type: Scratch.ArgumentType.STRING,
-                defaultValue: "提示"
-              }
-            }
-          },
-          "---",
-          {
-            opcode: 'getLastMsg',
+            opcode: 'getLastBroadcast',
             blockType: Scratch.BlockType.REPORTER,
-            text: '最近广播名称'
+            text: '上一条广播名称'
           },
           {
-            opcode: 'isMsgActive',
+            opcode: 'isBroadcastingNow',
             blockType: Scratch.BlockType.BOOLEAN,
-            text: '广播 [msg] 是否正在执行',
+            text: '广播 [MSG] 是否正在运行',
             arguments: {
-              msg: {
-                type: Scratch.ArgumentType.STRING,
-                defaultValue: "提示"
-              }
+              MSG: { type: Scratch.ArgumentType.STRING, defaultValue: '消息' }
             }
           },
           {
-            opcode: 'clearMsgRecord',
+            opcode: 'clearRecord',
             blockType: Scratch.BlockType.COMMAND,
             text: '清空广播记录'
           }
@@ -74,34 +54,28 @@
       };
     }
 
-    // 发送自定义广播
-    sendCustomBroadcast(args) {
-      const name = Scratch.Cast.toString(args.msg);
-      runtime.broadcast(name);
-    }
-
-    // 广播并等待
-    async sendCustomBroadcastWait(args, util) {
-      const name = Scratch.Cast.toString(args.msg);
-      await runtime.broadcastAndWait(name, util.target);
+    // 发送广播（稳定可用，无API报错）
+    sendBroadcast(args) {
+      const msg = Scratch.Cast.toString(args.MSG);
+      runtime.broadcast(msg);
     }
 
     // 获取上次广播名
-    getLastMsg() {
-      return this.lastBroadcastName;
+    getLastBroadcast() {
+      return this.lastMsg;
     }
 
-    // 判断广播是否运行中
-    isMsgActive(args) {
-      const name = Scratch.Cast.toString(args.msg);
-      return this.activeBroadcasts.has(name);
+    // 判断广播是否还在执行
+    isBroadcastingNow(args) {
+      const msg = Scratch.Cast.toString(args.MSG);
+      return this.runningMsg.has(msg);
     }
 
-    // 清空记录
-    clearMsgRecord() {
-      this.lastBroadcastName = "";
+    // 清空缓存
+    clearRecord() {
+      this.lastMsg = "";
     }
   }
 
-  Scratch.extensions.register(new BetterBroadcast());
+  Scratch.extensions.register(new StableBroadcast());
 })(Scratch);
