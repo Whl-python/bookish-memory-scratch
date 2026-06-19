@@ -3,75 +3,70 @@
   const vm = Scratch.vm;
   const runtime = vm.runtime;
 
-  class AdvBroadcast {
+  class BetterBroadcast {
     constructor() {
-      this.lastMsg = "";
-      this.justBroadcast = false;
-      this.runningBroadcasts = new Set();
-      // 监听系统原生广播事件
-      runtime.on('BROADCAST', (msgName) => {
-        this.lastMsg = msgName;
-        this.justBroadcast = true;
-        this.runningBroadcasts.add(msgName);
-        setTimeout(() => {
-          this.justBroadcast = false;
-          this.runningBroadcasts.delete(msgName);
-        }, 50);
+      this.lastBroadcastName = "";
+      this.activeBroadcasts = new Set();
+
+      // 全局监听所有广播
+      runtime.on('BROADCAST', (msg) => {
+        this.lastBroadcastName = msg;
+        this.activeBroadcasts.add(msg);
+      });
+
+      runtime.on('BROADCAST_END', (msg) => {
+        this.activeBroadcasts.delete(msg);
       });
     }
 
     getInfo() {
       return {
-        id: 'advBroadcast',
-        name: '增强广播',
-        color1: '#FF9900',
-        color2: '#E67700',
+        id: 'stableBroadcast',
+        name: '增强广播（稳定版）',
+        color1: '#ff7b00',
+        color2: '#e06c00',
         blocks: [
           {
-            opcode: 'whenReceiveCustom',
-            blockType: Scratch.BlockType.HAT,
-            text: '当收到广播 [MSG]',
-            isEdgeActivated: true, // 关键：开启边沿触发，没有这条永远不触发
+            opcode: 'sendCustomBroadcast',
+            blockType: Scratch.BlockType.COMMAND,
+            text: '发送广播 [msg]',
             arguments: {
-              MSG: {
+              msg: {
                 type: Scratch.ArgumentType.STRING,
-                defaultValue: 'start'
+                defaultValue: "提示"
               }
             }
           },
-          '---',
           {
-            opcode: 'sendBroadcast',
+            opcode: 'sendCustomBroadcastWait',
             blockType: Scratch.BlockType.COMMAND,
-            text: '发送广播 [MSG]',
+            text: '广播 [msg] 并等待',
             arguments: {
-              MSG: { type: Scratch.ArgumentType.STRING, defaultValue: '消息1' }
+              msg: {
+                type: Scratch.ArgumentType.STRING,
+                defaultValue: "提示"
+              }
             }
           },
+          "---",
           {
-            opcode: 'sendBroadcastWait',
-            blockType: Scratch.BlockType.COMMAND,
-            text: '广播 [MSG] 并等待',
-            arguments: {
-              MSG: { type: Scratch.ArgumentType.STRING, defaultValue: '消息1' }
-            }
-          },
-          '---',
-          {
-            opcode: 'getLastBroadcast',
+            opcode: 'getLastMsg',
             blockType: Scratch.BlockType.REPORTER,
-            text: '上次广播名称'
+            text: '最近广播名称'
           },
           {
-            opcode: 'isBroadcasting',
+            opcode: 'isMsgActive',
             blockType: Scratch.BlockType.BOOLEAN,
-            text: '正在广播 [MSG]?',
+            text: '广播 [msg] 是否正在执行',
             arguments: {
-              MSG: { type: Scratch.ArgumentType.STRING, defaultValue: '消息1' }
+              msg: {
+                type: Scratch.ArgumentType.STRING,
+                defaultValue: "提示"
+              }
             }
           },
           {
-            opcode: 'clearBroadcastRecord',
+            opcode: 'clearMsgRecord',
             blockType: Scratch.BlockType.COMMAND,
             text: '清空广播记录'
           }
@@ -79,36 +74,34 @@
       };
     }
 
-    // 帽子触发判断：必须同时满足「刚发送」+「名称匹配」
-    whenReceiveCustom(args) {
-      const targetMsg = Scratch.Cast.toString(args.MSG);
-      return this.justBroadcast && this.lastMsg === targetMsg;
+    // 发送自定义广播
+    sendCustomBroadcast(args) {
+      const name = Scratch.Cast.toString(args.msg);
+      runtime.broadcast(name);
     }
 
-    sendBroadcast(args) {
-      const msg = Scratch.Cast.toString(args.MSG);
-      runtime.broadcast(msg);
+    // 广播并等待
+    async sendCustomBroadcastWait(args, util) {
+      const name = Scratch.Cast.toString(args.msg);
+      await runtime.broadcastAndWait(name, util.target);
     }
 
-    async sendBroadcastWait(args, util) {
-      const msg = Scratch.Cast.toString(args.MSG);
-      await runtime.broadcastAndWait(msg, util.target);
+    // 获取上次广播名
+    getLastMsg() {
+      return this.lastBroadcastName;
     }
 
-    getLastBroadcast() {
-      return this.lastMsg;
+    // 判断广播是否运行中
+    isMsgActive(args) {
+      const name = Scratch.Cast.toString(args.msg);
+      return this.activeBroadcasts.has(name);
     }
 
-    isBroadcasting(args) {
-      const msg = Scratch.Cast.toString(args.MSG);
-      return this.runningBroadcasts.has(msg);
-    }
-
-    clearBroadcastRecord() {
-      this.lastMsg = "";
-      this.justBroadcast = false;
+    // 清空记录
+    clearMsgRecord() {
+      this.lastBroadcastName = "";
     }
   }
 
-  Scratch.extensions.register(new AdvBroadcast());
+  Scratch.extensions.register(new BetterBroadcast());
 })(Scratch);
