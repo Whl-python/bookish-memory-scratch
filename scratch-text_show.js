@@ -1,101 +1,106 @@
-(function(Scratch) {
-  'use strict';
-  const vm = Scratch.vm;
+(function () {
+  class TextAboveSprite {
+    constructor() {
+      // 创建顶层独立画布，盖在舞台上方
+      this.textCanvas = document.createElement("canvas");
+      this.textCtx = this.textCanvas.getContext("2d");
+      this.textCanvas.style.position = "absolute";
+      this.textCanvas.style.pointerEvents = "none";
+      this.textCanvas.style.zIndex = "999";
+      document.body.appendChild(this.textCanvas);
 
-  class TextOnTop {
+      this.textList = []; // 存储所有待渲染文字数据 {x,y,text,r,g,b,size}
+
+      // 每帧自动重绘文字
+      this.renderLoop = setInterval(() => this.drawAllText(), 30);
+    }
+
     getInfo() {
       return {
-        id: 'textOnTop',
-        name: '头顶文字显示',
-        color1: '#4285F4',
-        color2: '#3367D6',
+        id: "textAboveSprite",
+        name: "角色上方文字",
+        color1: "#ff9933",
+        color2: "#e67700",
+        color3: "#cc6600",
         blocks: [
           {
-            opcode: 'setTopText',
+            opcode: "showTextOverMe",
             blockType: Scratch.BlockType.COMMAND,
-            text: '设置头顶文字为 [TEXT] 字号[SIZE]颜色[COLOR]',
+            text: "显示文字 [TEXT] 字号[SIZE] 红[R]绿[G]蓝[B]",
             arguments: {
-              TEXT: { type: Scratch.ArgumentType.STRING, defaultValue: '按钮' },
+              TEXT: { type: Scratch.ArgumentType.STRING, defaultValue: "Hello" },
               SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 14 },
-              COLOR: { type: Scratch.ArgumentType.COLOR, defaultValue: '#000000' }
+              R: { type: Scratch.ArgumentType.NUMBER, defaultValue: 0 },
+              G: { type: Scratch.ArgumentType.NUMBER, defaultValue: 0 },
+              B: { type: Scratch.ArgumentType.NUMBER, defaultValue: 0 }
             }
           },
           {
-            opcode: 'clearTopText',
+            opcode: "clearAllFloatText",
             blockType: Scratch.BlockType.COMMAND,
-            text: '清除头顶文字'
-          },
-          {
-            opcode: 'setTextOffset',
-            blockType: Scratch.BlockType.COMMAND,
-            text: '文字上下偏移 [Y]',
-            arguments: {
-              Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 20 }
-            }
+            text: "清空所有文字"
           }
         ]
       };
     }
 
-    constructor() {
-      this.actorData = new Map();
-      this.renderLayer = null;
+    // 核心积木：在当前角色/克隆体头顶添加文字
+    showTextOverMe(args, util) {
+      const target = util.target;
+      const stage = util.runtime.stage;
+      const stageRect = stage.renderer.canvas.getBoundingClientRect();
+
+      // Scratch舞台坐标转屏幕像素坐标
+      const scale = stageRect.width / 480;
+      const screenX = stageRect.left + (240 + target.x) * scale;
+      const screenY = stageRect.top + (180 - target.y - 15) * scale;
+
+      // 存入渲染列表
+      this.textList.push({
+        x: screenX,
+        y: screenY,
+        text: String(args.TEXT),
+        size: Number(args.SIZE),
+        r: Number(args.R),
+        g: Number(args.G),
+        b: Number(args.B)
+      });
     }
 
-    setTopText(args, util) {
-      const targetId = util.target.id;
-      const text = Scratch.Cast.toString(args.TEXT);
-      const size = Scratch.Cast.toNumber(args.SIZE);
-      const color = args.COLOR;
-      const data = this.actorData.get(targetId) || { text: '', size: 14, color: '#000', offsetY: 20 };
-      data.text = text;
-      data.size = size;
-      data.color = color;
-      this.actorData.set(targetId, data);
-      this._initRender();
+    // 清空全部文字
+    clearAllFloatText() {
+      this.textList = [];
     }
 
-    clearTopText(args, util) {
-      const targetId = util.target.id;
-      const data = this.actorData.get(targetId);
-      if (data) data.text = '';
-    }
+    // 每帧绘制所有文字
+    drawAllText() {
+      const stageCanvas = document.querySelector("canvas");
+      if (!stageCanvas) return;
+      const rect = stageCanvas.getBoundingClientRect();
 
-    setTextOffset(args, util) {
-      const targetId = util.target.id;
-      const y = Scratch.Cast.toNumber(args.Y);
-      const data = this.actorData.get(targetId) || { text: '', size: 14, color: '#000', offsetY: 20 };
-      data.offsetY = y;
-      this.actorData.set(targetId, data);
-    }
+      // 同步画布尺寸
+      this.textCanvas.width = rect.width;
+      this.textCanvas.height = rect.height;
+      this.textCanvas.style.left = rect.left + "px";
+      this.textCanvas.style.top = rect.top + "px";
+      this.textCtx.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
 
-    _initRender() {
-      if (this.renderLayer) return;
-      const renderer = vm.renderer;
-      const oldDraw = renderer.draw;
-      renderer.draw = () => {
-        oldDraw.call(renderer);
-        const ctx = renderer._canvas.getContext('2d');
-        const stage = vm.runtime.getTargetForStage();
-        const stageScale = renderer._stageSize[0] / 480;
-        ctx.save();
-        ctx.scale(stageScale, stageScale);
-        this.actorData.forEach((data, tid) => {
-          if (!data.text) return;
-          const target = vm.runtime.getTargetById(tid);
-          if (!target || !target.isVisible()) return;
-          const pos = target.getXY();
-          const scale = target.getScale() / 100;
-          ctx.font = `${data.size * scale}px sans-serif`;
-          ctx.fillStyle = data.color;
-          ctx.textAlign = 'center';
-          ctx.fillText(data.text, pos[0], pos[1] - data.offsetY * scale);
-        });
-        ctx.restore();
-      };
-      this.renderLayer = true;
+      // 循环绘制每条文字
+      for (const t of this.textList) {
+        this.textCtx.fillStyle = `rgb(${t.r},${t.g},${t.b})`;
+        this.textCtx.font = `${t.size}px sans-serif`;
+        this.textCtx.textAlign = "center";
+        // 加白色描边防止文字看不清
+        this.textCtx.strokeStyle = "#ffffff";
+        this.textCtx.lineWidth = 2;
+        this.textCtx.strokeText(t.text, t.x - rect.left, t.y - rect.top);
+        this.textCtx.fillText(t.text, t.x - rect.left, t.y - rect.top);
+      }
+
+      // 单帧只保留本次新添加文字，实现只显示一帧
+      this.textList = [];
     }
   }
 
-  Scratch.extensions.register(new TextOnTop());
-})(Scratch);
+  Scratch.extensions.register(new TextAboveSprite());
+})();
