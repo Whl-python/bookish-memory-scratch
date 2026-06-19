@@ -7,7 +7,6 @@
     constructor() {
       this.lastMsg = "";
       this.runningMsg = new Set();
-      // 监听广播启停
       runtime.on('BROADCAST', msg => {
         this.lastMsg = msg;
         this.runningMsg.add(msg);
@@ -32,6 +31,7 @@
               MSG: { type: Scratch.ArgumentType.STRING, defaultValue: '消息' }
             }
           },
+          "---",
           {
             opcode: 'getLastBroadcast',
             blockType: Scratch.BlockType.REPORTER,
@@ -54,24 +54,20 @@
       };
     }
 
-    // 发送广播（稳定可用，无API报错）
     sendBroadcast(args) {
       const msg = Scratch.Cast.toString(args.MSG);
       runtime.broadcast(msg);
     }
 
-    // 获取上次广播名
     getLastBroadcast() {
       return this.lastMsg;
     }
 
-    // 判断广播是否还在执行
     isBroadcastingNow(args) {
       const msg = Scratch.Cast.toString(args.MSG);
       return this.runningMsg.has(msg);
     }
 
-    // 清空缓存
     clearRecord() {
       this.lastMsg = "";
     }
